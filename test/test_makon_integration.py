@@ -71,3 +71,21 @@ def test_launcher_targets_makon_and_defaults_local():
         content = (ROOT / filename).read_text()
         assert "Makon.py" in content
         assert "127.0.0.1" in content
+
+
+def test_review_approval_persists_but_resets_after_edits():
+    page = AppTest.from_file(str(ROOT / "webui/Makon.py"), default_timeout=45).run()
+    review = lambda: next(w for w in page.checkbox if w.label.startswith("I reviewed"))
+    render = lambda: next(b for b in page.button if b.label == "Render my video")
+    assert render().disabled
+    review().check().run()
+    assert not page.exception, [str(e.value) for e in page.exception]
+    assert review().value
+    assert not render().disabled
+    page.run()
+    assert review().value and not render().disabled
+    next(w for w in page.text_area if w.key == "caption").set_value("Changed post caption").run()
+    assert not page.exception
+    assert not review().value and render().disabled
+    review().check().run()
+    assert review().value and not render().disabled

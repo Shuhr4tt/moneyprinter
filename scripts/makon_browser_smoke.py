@@ -42,6 +42,7 @@ def main():
             browser = playwright.chromium.launch(headless=True)
             page = browser.new_page(viewport={"width": 1440, "height": 1100}, device_scale_factor=1)
             page.set_default_timeout(30000)
+            expect.set_options(timeout=15000)
             page.goto("http://127.0.0.1:8501")
             page.get_by_role("heading", name="Your next video starts here.").wait_for()
             try:
@@ -54,12 +55,22 @@ def main():
                 upload(page, "Upload in story order", OUT / "fixtures/test-card.png")
                 page.get_by_label("Post caption", exact=True).fill("Makon browser validation — synthetic media, not an advertisement.")
                 page.get_by_label("Post caption", exact=True).press("Tab")
+                # Let the pending text blur/upload reruns finish before approving
+                # the current input snapshot. A changed snapshot must invalidate approval.
+                page.wait_for_timeout(1000)
                 # React Aria keeps the native checkbox input visually hidden. Click
                 # its visible label exactly as a user would; do not force state in JS.
                 review = "I reviewed the script, have permission to use the media, and will review the finished video before posting."
                 page.get_by_text(review, exact=True).click()
                 expect(page.get_by_role("checkbox", name=review, exact=True)).to_be_checked()
                 render_button = page.get_by_role("button", name="Render my video", exact=True)
+                expect(render_button).to_be_enabled()
+                # Prove that editing after approval requires a new review.
+                page.get_by_label("Video title / topic", exact=True).fill("Makon browser validation")
+                page.get_by_label("Video title / topic", exact=True).press("Tab")
+                expect(page.get_by_role("checkbox", name=review, exact=True)).not_to_be_checked()
+                expect(render_button).to_be_disabled()
+                page.get_by_text(review, exact=True).click()
                 expect(render_button).to_be_enabled()
                 render_button.click()
                 page.get_by_text("Render complete. Watch the entire video before posting.", exact=True).wait_for(timeout=240000)
