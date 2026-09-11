@@ -1,0 +1,16 @@
+[data-testid="stAppViewContainer"] {background:#f7f8f6;}
+[data-testid="stHeader"] {background:rgba(247,248,246,.96);}
+.block-container {max-width:1320px;padding-top:3rem;padding-bottom:2rem;}
+h1 {color:#172722;font-weight:750;letter-spacing:-.045em;font-size:2.8rem;}
+h2,h3 {color:#243a32;letter-spacing:-.02em;}
+.makon-kicker {color:#497965;font-size:.73rem;font-weight:750;letter-spacing:.16em;margin-bottom:.25rem;}
+.stTabs [data-baseweb="tab-list"] {gap:2rem;border-bottom:1px solid #dce5dc;margin:1.25rem 0 1.3rem;}
+.stTabs [data-baseweb="tab"] {font-weight:650;}
+.stTabs [aria-selected="true"] {color:#236144;}
+.stTabs [data-baseweb="tab-highlight"] {background:#236144;}
+[data-testid="stTextInput"] input,[data-testid="stTextArea"] textarea {background:#fff;}
+[data-testid="stButton"] button[kind="primary"] {background:#236144;border-color:#236144;border-radius:10px;padding:.65rem 1.4rem;}
+[data-testid="stExpander"] {background:#fff;border:1px solid #dde5dc;border-radius:12px;}
+[data-testid="stFileUploader"] {border-radius:12px;}
+[data-testid="stCaptionContainer"] {color:#66746a;}
+#MainMenu {visibility:hidden;}

@@ -1,0 +1,128 @@
+name: Makon validation
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: makon-validation-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'Shuhr4tt/moneyprinter'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Integrate the pinned engine without overwriting unrelated files
+        run: python scripts/apply_makon_engine.py
+      - name: Commit integration once and select exact source for tests
+        id: source
+        run: |
+          git config user.name 'Makon Studio Setup'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -u
+          if ! git diff --cached --quiet; then
+            git commit -m 'Integrate Makon captions, safe config persistence and English launch defaults'
+            git push origin HEAD:main
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Package reviewable source (text only, no fonts or runtime files)
+        shell: python
+        run: |
+          import pathlib, subprocess, zipfile
+          allowed = {'.py','.md','.css','.toml','.yml','.yaml','.json','.sh','.bat','.txt','.lock'}
+          files = subprocess.check_output(['git','ls-files','-z']).decode().split('\0')
+          with zipfile.ZipFile('makon-source-review.zip','w',zipfile.ZIP_DEFLATED) as archive:
+              for name in files:
+                  p = pathlib.Path(name)
+                  if p.is_file() and not name.startswith('docs/') and (p.suffix in allowed or p.name in {'LICENSE','.gitignore','.dockerignore','Dockerfile','Dockerfile.makon'}):
+                      archive.write(p, name)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: makon-reviewed-source
+          path: makon-source-review.zip
+          retention-days: 7
+  native:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      PYTHONUTF8: '1'
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install uv==0.8.22
+      - name: Install locked dependencies
+        id: sync
+        run: uv sync --frozen
+      - name: Native regression and English UI tests
+        run: uv run pytest test/test_makon_helpers.py test/test_makon_integration.py test/services/test_config.py test/services/test_task.py test/services/test_webui_task.py test/services/test_cli.py test/services/test_video.py -q --junitxml=validation/tests.xml
+      - name: Install video verification tools
+        if: always() && runner.os == 'Linux' && steps.sync.outcome == 'success'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Real production pipeline render without API calls
+        id: render
+        if: always() && runner.os == 'Linux' && steps.sync.outcome == 'success'
+        run: uv run python scripts/makon_smoke.py
+      - name: Install test-only browser
+        if: always() && runner.os == 'Linux' && steps.render.outcome == 'success'
+        run: |
+          uv pip install playwright==1.55.0
+          uv run --no-sync python -m playwright install --with-deps chromium
+      - name: Browser upload, trim, caption, render and download
+        if: always() && runner.os == 'Linux' && steps.render.outcome == 'success'
+        run: uv run --no-sync python scripts/makon_browser_smoke.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: makon-validation-${{ runner.os }}
+          path: |
+            validation/*.xml
+            validation/*.json
+            validation/*.mp4
+            validation/*.png
+            validation/*.zip
+            validation/browser-failure.txt
+            validation/browser-server.log
+          if-no-files-found: warn
+          retention-days: 14
+  docker:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          persist-credentials: false
+      - name: Build customized image
+        run: docker build -f Dockerfile.makon -t makon-studio:test .
+      - name: Start persistent non-root container and verify health
+        run: |
+          docker run -d --name makon-test -p 127.0.0.1:8501:8501 -v makon-ci-storage:/app/storage makon-studio:test
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8501/_stcore/health; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8501/_stcore/health
+          docker exec makon-test .venv/bin/python -c "from streamlit.testing.v1 import AppTest; p=AppTest.from_file('webui/Makon.py',default_timeout=60).run(); assert not p.exception, [e.value for e in p.exception]; assert len(p.tabs)==3; print('Container English app test passed')"
+          docker exec makon-test test -f /app/storage/config.toml
+      - name: Container logs
+        if: always()
+        run: docker logs makon-test || true

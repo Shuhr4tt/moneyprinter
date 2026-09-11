@@ -1,0 +1,17 @@
+services:
+  studio:
+    build:
+      context: .
+      dockerfile: Dockerfile.makon
+    ports:
+      - "127.0.0.1:8501:8501"
+    environment:
+      MPT_CONFIG_FILE: /app/storage/config.toml
+      TZ: Asia/Tashkent
+    volumes:
+      - makon-storage:/app/storage
+    restart: unless-stopped
+    init: true
+    shm_size: 256mb
+volumes:
+  makon-storage:
