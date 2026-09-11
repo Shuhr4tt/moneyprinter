@@ -123,6 +123,8 @@ class VideoParams(BaseModel):
     custom_audio_file: Optional[str] = (
         None  # Custom audio file path, will ignore TTS and can still use Whisper subtitles
     )
+    # Makon: manual captions must remain inside the current task.
+    custom_subtitle_file: Optional[str] = None
     video_language: Optional[str] = ""  # auto detect
 
     voice_name: Optional[str] = ""

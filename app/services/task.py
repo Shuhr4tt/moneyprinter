@@ -580,6 +580,14 @@ def generate_subtitle(task_id, params, video_script, sub_maker, audio_file):
         return ""
 
     subtitle_path = path.join(utils.task_dir(task_id), "subtitle.srt")
+    manual_subtitles = getattr(params, "custom_subtitle_file", None)
+    if manual_subtitles:
+        from pathlib import Path
+        from app.makon import copy_validated_subtitles
+        return copy_validated_subtitles(
+            Path(utils.task_dir(task_id)), manual_subtitles,
+            voice.get_audio_duration(audio_file),
+        )
     subtitle_provider = config.app.get("subtitle_provider", "edge").strip().lower()
     logger.info(f"\n\n## generating subtitle, provider: {subtitle_provider}")
 
@@ -1590,6 +1598,15 @@ def _run_pipeline(
             "video",
             "failed to generate final video",
         )
+
+    # Do not offer a partial file left by an interrupted render as a finished export.
+    makon_project = path.join(utils.task_dir(task_id), "makon.json")
+    if os.path.isfile(makon_project):
+        from pathlib import Path
+        marker = Path(utils.task_dir(task_id)) / "makon-export.json"
+        temporary_marker = marker.with_suffix(".tmp")
+        temporary_marker.write_text(json.dumps({"complete": True, "files": [path.basename(p) for p in final_video_paths]}), encoding="utf-8")
+        temporary_marker.replace(marker)
 
     logger.success(
         f"task {task_id} finished, generated {len(final_video_paths)} videos."

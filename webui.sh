@@ -69,7 +69,7 @@ fi
 MPT_WEBUI_PORT="$SELECTED_WEBUI_PORT"
 
 echo "***** WebUI address: http://$MPT_WEBUI_HOST:$MPT_WEBUI_PORT *****"
-"$@" run "$CURRENT_DIR/webui/Main.py" \
+"$@" run "$CURRENT_DIR/webui/Makon.py" \
   --server.address="$MPT_WEBUI_HOST" \
   --server.port="$MPT_WEBUI_PORT" \
   --browser.serverAddress="$MPT_WEBUI_HOST" \

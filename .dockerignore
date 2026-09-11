@@ -28,3 +28,7 @@ logs/
 
 storage/
 config.toml
+
+validation/
+.github/
+test/
