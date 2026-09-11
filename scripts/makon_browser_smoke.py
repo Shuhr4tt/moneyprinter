@@ -4,9 +4,10 @@ import json
 import subprocess
 import sys
 import time
+import traceback
 import urllib.request
 from pathlib import Path
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "validation"
@@ -53,8 +54,14 @@ def main():
                 upload(page, "Upload in story order", OUT / "fixtures/test-card.png")
                 page.get_by_label("Post caption", exact=True).fill("Makon browser validation — synthetic media, not an advertisement.")
                 page.get_by_label("Post caption", exact=True).press("Tab")
-                page.get_by_role("checkbox", name="I reviewed the script, have permission").check()
-                page.get_by_role("button", name="Render my video", exact=True).click()
+                # React Aria keeps the native checkbox input visually hidden. Click
+                # its visible label exactly as a user would; do not force state in JS.
+                review = "I reviewed the script, have permission to use the media, and will review the finished video before posting."
+                page.get_by_text(review, exact=True).click()
+                expect(page.get_by_role("checkbox", name=review, exact=True)).to_be_checked()
+                render_button = page.get_by_role("button", name="Render my video", exact=True)
+                expect(render_button).to_be_enabled()
+                render_button.click()
                 page.get_by_text("Render complete. Watch the entire video before posting.", exact=True).wait_for(timeout=240000)
                 page.get_by_role("button", name="Download MP4", exact=True).first.scroll_into_view_if_needed()
                 with page.expect_download(timeout=30000) as download:
@@ -71,7 +78,7 @@ def main():
                 (OUT / "browser-validation.json").write_text(json.dumps({"browser_upload_render_download": "passed", "resolution": "1080x1920", "duration_seconds": float(probe["format"]["duration"]), "fixture": "synthetic image + tone + SRT"}, indent=2))
             except Exception:
                 page.screenshot(path=str(OUT / "browser-failure.png"), full_page=True)
-                (OUT / "browser-failure.txt").write_text(page.locator("body").inner_text())
+                (OUT / "browser-failure.txt").write_text(traceback.format_exc() + "\n\n" + page.locator("body").inner_text())
                 raise
             finally:
                 browser.close()
