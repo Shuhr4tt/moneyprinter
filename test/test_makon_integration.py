@@ -7,6 +7,7 @@ from streamlit.testing.v1 import AppTest
 from app.config import config
 from app.models.schema import VideoParams
 from app.services import task
+from test.makon_media_cases import TestMakonMedia
 
 ROOT = Path(__file__).resolve().parents[1]
 SRT = "1\n00:00:00,000 --> 00:00:02,000\nA real timed caption.\n"

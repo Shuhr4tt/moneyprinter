@@ -21,6 +21,7 @@ from app.makon import (
     redact_error, trim_audio, validate_srt, write_project,
 )
 from app.models import const
+from app.makon_media import visual_upload_directory
 from app.models.schema import MaterialInfo, VideoParams
 from app.services import llm, state as sm, voice, webui_task
 from app.utils import utils
@@ -65,7 +66,8 @@ def output_controls(directory: Path, key: str) -> None:
         st.info("No finished export yet. A failed or interrupted task has no downloadable final video.")
         return
     for index, video in enumerate(videos):
-        st.video(str(video))
+        with st.columns([1, 2])[0]:
+            st.video(str(video))
         cols = st.columns(2)
         with cols[0], video.open("rb") as handle:
             st.download_button("Download MP4", handle, file_name=f"makon-{directory.name[:8]}-{index+1}.mp4",
@@ -305,7 +307,7 @@ with create_tab:
                     normalized = validate_srt(srt_upload.getvalue().decode("utf-8-sig"), excerpt_length if audio_upload else None)
                     subtitle_path = directory / "uploaded.srt"
                     subtitle_path.write_text(normalized, encoding="utf-8")
-                materials = [MaterialInfo(provider="local", url=str(persist_upload(directory, u.name, u.getvalue(), VISUAL_EXTENSIONS))) for u in uploads] if source == "local" else None
+                materials = [MaterialInfo(provider="local", url=str(persist_upload(visual_upload_directory(task_id), u.name, u.getvalue(), VISUAL_EXTENSIONS))) for u in uploads] if source == "local" else None
                 pipeline_script = script.strip() or topic.strip()
                 params = VideoParams(video_subject=topic.strip(), video_script=pipeline_script,
                     video_language=language, voice_name=voice_name,

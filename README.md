@@ -138,7 +138,8 @@ the source of truth for which checks actually passed.**
 
 ## Storage and safety
 
-Project files live in `storage/tasks/<task-id>/`; the Library shows the most
+Uploaded visuals stay in `storage/local_videos/makon/<task-id>/`, inside the engine's allowed media directory.
+Project files, audio and captions live in `storage/tasks/<task-id>/`; the Library shows the most
 recent 30, while older projects remain on disk. Browser draft state is not an
 autosaved project. No automatic cleanup deletes customer files.
 

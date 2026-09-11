@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT))
 from PIL import Image, ImageDraw, ImageFont
 from app.config import config
 from app.makon import export_pack, trim_audio, write_project
+from app.makon_media import visual_upload_directory
 from app.models.schema import MaterialInfo, VideoParams
 from app.services import state as sm, task, voice
 from app.utils import utils
@@ -42,7 +43,7 @@ def main():
         draw.text((135, 570+i*110), line, fill="white", font=font)
     draw.text((120, 1500), "TECHNICAL DEMO / NO AI GENERATED AUDIO", fill="#385947", font=small)
     draw.text((120, 1560), "Local image + trimmed tone + timed captions", fill="#385947", font=small)
-    visual = directory / "test-card.png"
+    visual = visual_upload_directory(task_id) / "test-card.png"
     image.save(visual)
     srt = directory / "uploaded.srt"
     srt.write_text("1\n00:00:00,000 --> 00:00:02,000\nMakon Video Studio\n\n2\n00:00:02,000 --> 00:00:04,000\nReal export. Manual timing.\n", encoding="utf-8")
