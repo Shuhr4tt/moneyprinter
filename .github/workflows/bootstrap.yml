@@ -1,0 +1,68 @@
+name: Import pinned MoneyPrinterTurbo
+on:
+  push:
+    paths: ['.github/workflows/bootstrap.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import:
+    if: github.repository == 'Shuhr4tt/moneyprinter'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to overwrite an existing application
+        run: |
+          if [ -e app/models/schema.py ]; then
+            echo 'Upstream is already imported. Refusing to overwrite it.' >&2
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          repository: harry0703/MoneyPrinterTurbo
+          ref: 436b0e9cc830ef7639e33388917e389cf30d3307
+          path: .upstream-source
+          persist-credentials: false
+      - name: Import source and preserve upstream license
+        shell: python
+        run: |
+          import pathlib, shutil, subprocess
+          source = pathlib.Path('.upstream-source')
+          actual = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
+          assert actual == '436b0e9cc830ef7639e33388917e389cf30d3307'
+          paths = subprocess.check_output(['git', '-C', str(source), 'ls-files', '-z']).decode().split('\0')
+          copied = []
+          for name in paths:
+              if not name or name.startswith('.github/') or name == 'config.toml':
+                  continue
+              target = pathlib.Path(name)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(source / name, target)
+              copied.append(name)
+          pathlib.Path('UPSTREAM.md').write_text('# Upstream provenance\n\nMoneyPrinterTurbo by Harry, MIT licensed.\n\nSource: https://github.com/harry0703/MoneyPrinterTurbo\nPinned commit: ' + actual + '\n\nMakon customizations are maintained in this repository. Upstream GitHub workflows were not imported.\n', encoding='utf-8')
+          for start in range(0, len(copied), 80):
+              subprocess.run(['git', 'add', '--force', '--', *copied[start:start+80]], check=True)
+          subprocess.run(['git', 'add', 'UPSTREAM.md'], check=True)
+          shutil.rmtree(source)
+      - name: Commit imported source
+        run: |
+          git config user.name 'Makon Studio Setup'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Import MoneyPrinterTurbo at pinned upstream revision 436b0e9'
+          git push origin HEAD:main
+      - name: Package text source for review
+        shell: python
+        run: |
+          import pathlib, subprocess, zipfile
+          names = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          allowed = {'.py', '.json', '.toml', '.txt', '.md', '.yml', '.yaml', '.sh', '.bat', '.css', '.html', '.lock'}
+          with zipfile.ZipFile('source-review.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+              for name in names:
+                  p = pathlib.Path(name)
+                  if p.is_file() and (p.suffix in allowed or p.name in {'LICENSE', 'Dockerfile', '.gitignore', '.dockerignore'}) and not name.startswith('docs/'):
+                      archive.write(p, name)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-review
+          path: source-review.zip
+          retention-days: 3
