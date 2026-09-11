@@ -60,6 +60,21 @@ def main():
     replace("webui.sh", "webui/Main.py", "webui/Makon.py")
     replace("test/services/test_config.py", 'assert example_config["listen_host"] == "0.0.0.0"', 'assert example_config["listen_host"] == "127.0.0.1"')
     replace("test/services/test_config.py", 'assert example_config["log_level"] == "DEBUG"', 'assert example_config["log_level"] == "INFO"')
+    # Local visuals must use the engine's dedicated media sandbox, not task storage.
+    for name in ("webui/Makon.py", "scripts/makon_smoke.py"):
+        replace(name, "from app.models.schema import MaterialInfo, VideoParams",
+                "from app.makon_media import visual_upload_directory\nfrom app.models.schema import MaterialInfo, VideoParams")
+    replace("webui/Makon.py", "persist_upload(directory, u.name, u.getvalue(), VISUAL_EXTENSIONS)",
+            "persist_upload(visual_upload_directory(task_id), u.name, u.getvalue(), VISUAL_EXTENSIONS)")
+    replace("scripts/makon_smoke.py", 'visual = directory / "test-card.png"',
+            'visual = visual_upload_directory(task_id) / "test-card.png"')
+    replace("webui/Makon.py", "        st.video(str(video))",
+            "        with st.columns([1, 2])[0]:\n            st.video(str(video))")
+    replace("README.md", "Project files live in `storage/tasks/<task-id>/`; the Library shows the most",
+            "Uploaded visuals stay in `storage/local_videos/makon/<task-id>/`, inside the engine's allowed media directory.\nProject files, audio and captions live in `storage/tasks/<task-id>/`; the Library shows the most")
+    replace("test/test_makon_integration.py", "from app.services import task",
+            "from app.services import task\nfrom test.makon_media_cases import TestMakonMedia")
+
     for name, suffix in [(".gitignore", "\n# Makon local validation and credentials\n/validation/\n.env.*\n*.pem\n"),
                          (".dockerignore", "\nvalidation/\n.github/\ntest/\n")]:
         file = ROOT / name
